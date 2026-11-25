@@ -1,0 +1,45 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Android proýektini döret (ýok bolsa)
+        run: |
+          if [ ! -d android ]; then
+            flutter create --platforms=android --org com.oraz --project-name yandepderche_app /tmp/gen
+            cp -r /tmp/gen/android android
+          fi
+
+      - name: Sazlamalar (minSdk 24, internet, at)
+        run: |
+          sed -i 's/flutter.minSdkVersion/24/' android/app/build.gradle*
+          M=android/app/src/main/AndroidManifest.xml
+          grep -q 'permission.INTERNET' $M || sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <application|' $M
+          sed -i 's|android:label="[^"]*"|android:label="Yandepderçe"|' $M
+
+      - run: flutter pub get
+      - run: dart run flutter_launcher_icons
+      - run: flutter build apk --release --split-per-abi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yandepderche-apk
+          path: build/app/outputs/flutter-apk/*.apk
